@@ -1,6 +1,7 @@
 import io
 import subprocess
 import unittest
+import unittest.mock
 import urllib.error
 from pathlib import Path
 
@@ -109,6 +110,22 @@ class HttpTest(unittest.TestCase):
         with self.assertRaises(YapError) as ctx:
             self.call(FakeResponse(b"{}", "application/json"))
         self.assertEqual(ctx.exception.code, Exit.PROVIDER)
+
+    def test_response_size_cap(self):
+        from yap_permit.providers import http
+        with unittest.mock.patch.object(http, "MAX_AUDIO_BYTES", 10):
+            with self.assertRaises(YapError) as ctx:
+                self.call(FakeResponse(b"x" * 11, "audio/mpeg"))
+        self.assertIn("too large", str(ctx.exception))
+
+    def test_total_deadline(self):
+        from yap_permit.providers import http
+        clock = iter([0, 0, 100])
+        with unittest.mock.patch.object(http.time, "monotonic",
+                                        lambda: next(clock)):
+            with self.assertRaises(YapError) as ctx:
+                self.call(FakeResponse(b"x" * 10, "audio/mpeg"))
+        self.assertIn("timed out", str(ctx.exception))
 
     def test_http_error_hides_body(self):
         err = urllib.error.HTTPError("https://x", 401, "no", {},
