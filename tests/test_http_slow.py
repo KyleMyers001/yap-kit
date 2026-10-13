@@ -29,6 +29,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 return
             self.send_response(200)
             self.send_header("Content-Type", "audio/mpeg")
+            if mode == "drip-length":
+                self.send_header("Content-Length", "100")
             self.end_headers()
             for _ in range(20):  # 1 byte every 0.2 s for ~4 s
                 self.wfile.write(b"x")
@@ -64,6 +66,10 @@ class SlowServerTest(unittest.TestCase):
 
     def test_body_drip_bounded(self):
         self.assert_times_out("drip")
+
+    def test_body_drip_with_content_length_bounded(self):
+        # Reviewer repro: partial body must not be returned as success.
+        self.assert_times_out("drip-length")
 
     def test_header_drip_bounded(self):
         self.assert_times_out("drip-headers")

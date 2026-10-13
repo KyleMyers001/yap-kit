@@ -95,6 +95,21 @@ class FakeResponse(io.BytesIO):
         return self.read(min(size, 4))
 
 
+class CutOffResponse(FakeResponse):
+    """Simulates the watchdog firing mid-body: shutdown reads as EOF."""
+
+    def __init__(self, on_cut):
+        super().__init__(b"partial", "audio/mpeg")
+        self.length = 100 - len(b"partial")
+        self.on_cut = on_cut
+
+    def read1(self, size=-1):
+        data = self.read()
+        if not data:
+            self.on_cut()
+        return data
+
+
 class FakeConn:
     def __init__(self, result):
         self.result = result
@@ -142,6 +157,31 @@ class HttpTest(unittest.TestCase):
         with self.assertRaises(YapError) as ctx:
             self.call(socket.timeout())
         self.assertEqual(str(ctx.exception), "P request timed out")
+
+    def test_watchdog_abort_is_timeout_not_partial_success(self):
+        # Fire the watchdog's abort exactly when the body is cut off,
+        # long before the 60 s deadline, so no timing is involved.
+        from yap_permit.providers import http
+        conn = FakeConn(None)
+        resp = CutOffResponse(lambda: http._abort(conn, aborted))
+        conn.result = resp
+        real_event = http.threading.Event
+        aborted = real_event()
+        with unittest.mock.patch.object(http.threading, "Event",
+                                        return_value=aborted):
+            with self.assertRaises(YapError) as ctx:
+                post_for_audio("P", "https://x", {}, {}, 60,
+                               connect=lambda u, t: (conn, "/"))
+        self.assertEqual(ctx.exception.code, Exit.PROVIDER)
+        self.assertEqual(str(ctx.exception), "P request timed out")
+
+    def test_short_body_against_content_length_fails(self):
+        resp = FakeResponse(b"only6!", "audio/mpeg")
+        resp.length = 94  # http.client's bytes-still-expected counter
+        with self.assertRaises(YapError) as ctx:
+            self.call(resp)
+        self.assertEqual(ctx.exception.code, Exit.PROVIDER)
+        self.assertEqual(str(ctx.exception), "P request failed")
 
     def test_connection_error_says_failed(self):
         with self.assertRaises(YapError) as ctx:

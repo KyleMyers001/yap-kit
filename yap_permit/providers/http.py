@@ -45,7 +45,8 @@ def post_for_audio(provider, url, headers, payload, timeout,
     deadline = _Deadline(timeout)
     conn, path = (connect or _connection)(url, timeout)
     # Closing the socket from another thread unblocks any pending read.
-    watchdog = threading.Timer(timeout, _abort, (conn,))
+    aborted = threading.Event()
+    watchdog = threading.Timer(timeout, _abort, (conn, aborted))
     watchdog.daemon = True
     watchdog.start()
     try:
@@ -58,7 +59,7 @@ def post_for_audio(provider, url, headers, payload, timeout,
             raise YapError(Exit.PROVIDER,
                            f"{provider} returned HTTP {resp.status}")
         mime = resp.getheader("Content-Type", "")
-        data = _read_capped(provider, resp, deadline)
+        data = _read_capped(provider, resp, deadline, aborted)
     except (socket.timeout, TimeoutError):
         raise YapError(Exit.PROVIDER, f"{provider} request timed out") \
             from None
@@ -75,7 +76,8 @@ def post_for_audio(provider, url, headers, payload, timeout,
     return data
 
 
-def _abort(conn) -> None:
+def _abort(conn, aborted: threading.Event) -> None:
+    aborted.set()  # set first: a reader woken by shutdown must see it
     sock = getattr(conn, "sock", None)
     if sock is not None:
         try:
@@ -84,12 +86,19 @@ def _abort(conn) -> None:
             pass
 
 
-def _read_capped(provider, resp, deadline) -> bytes:
+def _read_capped(provider, resp, deadline, aborted) -> bytes:
+    """Read the whole body; a cut-off or short body is never success."""
     data = bytearray()
     while True:
         deadline.remaining()  # raises once time is up
         chunk = resp.read1(CHUNK)
         if not chunk:
+            # The watchdog's shutdown looks like EOF to the reader.
+            if aborted.is_set() or time.monotonic() >= deadline.end:
+                raise socket.timeout()
+            remaining = getattr(resp, "length", None)
+            if isinstance(remaining, int) and remaining > 0:
+                raise http.client.IncompleteRead(bytes(data), remaining)
             return bytes(data)
         data += chunk
         if len(data) > MAX_AUDIO_BYTES:
