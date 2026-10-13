@@ -11,6 +11,7 @@ from yap_permit import coreaudio
 from yap_permit.errors import Exit, YapError
 
 BLUETOOTH_TRANSPORTS = ("blue", "blea")   # Classic and LE
+BUILTIN_TRANSPORT = "bltn"
 HEADPHONE_DATA_SOURCE = "hdpn"            # wired headphones on the jack
 PRIVATE_NAME_WORDS = ("airpods", "headphones", "earbuds", "buds")
 SPEAKER_NAME_WORDS = ("speaker", "pill")
@@ -36,7 +37,8 @@ def is_private_output(output: Output) -> bool:
     with no speaker words (Bluetooth speakers share the transport).
     Anything unverified is refused.
     """
-    if output.data_source == HEADPHONE_DATA_SOURCE:
+    if (output.transport == BUILTIN_TRANSPORT
+            and output.data_source == HEADPHONE_DATA_SOURCE):
         return True
     if output.transport not in BLUETOOTH_TRANSPORTS:
         return False

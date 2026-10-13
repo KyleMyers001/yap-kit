@@ -12,6 +12,7 @@ class Exit(IntEnum):
     PROVIDER = 5          # synthesis failed
     DEPENDENCY = 6        # required binary or platform missing
     PLAYBACK = 7          # player failed
+    OUTPUT_FILE = 8       # --out path invalid or unwritable
     CANCELLED = 130       # SIGINT / SIGTERM
 
 

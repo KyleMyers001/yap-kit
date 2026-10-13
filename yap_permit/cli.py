@@ -47,7 +47,15 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def read_text(arg: str) -> str:
-    text = (sys.stdin.read() if arg == "-" else arg).strip()
+    if arg == "-":
+        try:
+            raw = sys.stdin.buffer.read() if hasattr(sys.stdin, "buffer") \
+                else sys.stdin.read().encode("utf-8")
+            text = raw.decode("utf-8").strip()
+        except UnicodeError:
+            raise YapError(Exit.USAGE, "stdin is not valid UTF-8") from None
+    else:
+        text = arg.strip()
     if not text:
         raise YapError(Exit.USAGE, "no text to speak")
     if len(text) > MAX_CHARS:
@@ -62,6 +70,8 @@ def run(args) -> None:
         raise YapError(Exit.USAGE, "--out cannot be combined with "
                        "--private or --device")
     synthesize = providers.get(args.provider)
+    if args.out and args.out != "-":
+        _check_writable(args.out)  # before any paid request
     text = read_text(args.text)
     gate = OutputGate(private=args.private, device=args.device)
     # Gate before credentials or network so a refused output costs nothing.
@@ -83,12 +93,35 @@ def run(args) -> None:
         play(path, gate, output)
 
 
+def _check_writable(out: str) -> None:
+    path = Path(out)
+    parent = path.parent if str(path.parent) else Path(".")
+    if path.is_dir():
+        raise YapError(Exit.OUTPUT_FILE, f"--out {out} is a directory")
+    if not parent.is_dir():
+        raise YapError(Exit.OUTPUT_FILE, f"--out directory {parent} "
+                       "does not exist")
+    if not os.access(parent, os.W_OK) or (
+            path.exists() and not os.access(path, os.W_OK)):
+        raise YapError(Exit.OUTPUT_FILE, f"--out {out} is not writable")
+
+
 def _write(data: bytes, out: str) -> None:
     if out == "-":
-        sys.stdout.buffer.write(data)
-        sys.stdout.buffer.flush()
-    else:
+        try:
+            sys.stdout.buffer.write(data)
+            sys.stdout.buffer.flush()
+        except BrokenPipeError:
+            # Reader went away (e.g. `| head`); silence the exit flush too.
+            devnull = os.open(os.devnull, os.O_WRONLY)
+            os.dup2(devnull, sys.stdout.fileno())
+        return
+    try:
         Path(out).write_bytes(data)
+    except OSError as exc:
+        raise YapError(Exit.OUTPUT_FILE,
+                       f"could not write --out {out}: {exc.strerror}") \
+            from None
 
 
 def _raise_interrupt(signum, frame):

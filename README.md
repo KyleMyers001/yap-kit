@@ -86,9 +86,10 @@ default output. `--private` and `--device` add a gate on that output:
 | 5 | Provider failed |
 | 6 | Missing dependency (`say`, `afplay`) |
 | 7 | Player failed |
+| 8 | `--out` path is a directory, missing, or unwritable (checked before any provider call) |
 | 130 | Cancelled (SIGINT or SIGTERM); playback stopped |
 
-Text is limited to 5,000 characters. `--out FILE` overwrites an existing
+Text is limited to 5,000 characters. Stdin must be valid UTF-8. `--out FILE` overwrites an existing
 file. Cloud responses are capped at 25 MB and the `--timeout` applies to
 the whole request.
 

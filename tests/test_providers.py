@@ -83,28 +83,42 @@ class MacSayTest(unittest.TestCase):
 
 
 class FakeResponse(io.BytesIO):
-    def __init__(self, data, mime):
+    def __init__(self, data, mime, status=200):
         super().__init__(data)
-        self.headers = {"Content-Type": mime}
+        self.status = status
+        self.mime = mime
+
+    def getheader(self, name, default=None):
+        return self.mime
+
+    def read1(self, size=-1):
+        return self.read(min(size, 4))
 
 
-class FakeOpener:
+class FakeConn:
     def __init__(self, result):
         self.result = result
 
-    def open(self, request, timeout):
-        if isinstance(self.result, Exception):
+    def request(self, *a, **k):
+        pass
+
+    def getresponse(self):
+        if isinstance(self.result, BaseException):
             raise self.result
         return self.result
 
+    def close(self):
+        pass
+
 
 class HttpTest(unittest.TestCase):
-    def call(self, result):
-        return post_for_audio("P", "https://x", {}, {}, 5,
-                              opener=FakeOpener(result))
+    def call(self, result, timeout=5):
+        return post_for_audio("P", "https://x", {}, {}, timeout,
+                              connect=lambda u, t: (FakeConn(result), "/"))
 
     def test_returns_audio(self):
-        self.assertEqual(self.call(FakeResponse(b"a", "audio/mpeg")), b"a")
+        self.assertEqual(self.call(FakeResponse(b"abcdefg", "audio/mpeg")),
+                         b"abcdefg")
 
     def test_rejects_non_audio(self):
         with self.assertRaises(YapError) as ctx:
@@ -118,21 +132,21 @@ class HttpTest(unittest.TestCase):
                 self.call(FakeResponse(b"x" * 11, "audio/mpeg"))
         self.assertIn("too large", str(ctx.exception))
 
-    def test_total_deadline(self):
-        from yap_permit.providers import http
-        clock = iter([0, 0, 100])
-        with unittest.mock.patch.object(http.time, "monotonic",
-                                        lambda: next(clock)):
-            with self.assertRaises(YapError) as ctx:
-                self.call(FakeResponse(b"x" * 10, "audio/mpeg"))
-        self.assertIn("timed out", str(ctx.exception))
-
     def test_http_error_hides_body(self):
-        err = urllib.error.HTTPError("https://x", 401, "no", {},
-                                     io.BytesIO(b"secret detail"))
         with self.assertRaises(YapError) as ctx:
-            self.call(err)
+            self.call(FakeResponse(b"secret detail", "text/plain", 401))
         self.assertEqual(str(ctx.exception), "P returned HTTP 401")
+
+    def test_socket_timeout_says_timed_out(self):
+        import socket
+        with self.assertRaises(YapError) as ctx:
+            self.call(socket.timeout())
+        self.assertEqual(str(ctx.exception), "P request timed out")
+
+    def test_connection_error_says_failed(self):
+        with self.assertRaises(YapError) as ctx:
+            self.call(ConnectionRefusedError())
+        self.assertEqual(str(ctx.exception), "P request failed")
 
 
 if __name__ == "__main__":

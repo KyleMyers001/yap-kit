@@ -1,9 +1,16 @@
-"""POST JSON, get audio. Refuses redirects so keys are never forwarded."""
+"""POST JSON, get audio, within one total deadline.
 
+Uses http.client directly: redirects are never followed (so keys are
+never forwarded), and a watchdog closes the socket at the deadline, so
+slow connects, dripping headers, and trickling bodies are all bounded.
+"""
+
+import http.client
 import json
+import socket
+import threading
 import time
-import urllib.error
-import urllib.request
+import urllib.parse
 
 from yap_permit.errors import Exit, YapError
 
@@ -11,46 +18,77 @@ MAX_AUDIO_BYTES = 25 * 1024 * 1024  # ~25 min of 128 kbps MP3
 CHUNK = 64 * 1024
 
 
-class _NoRedirects(urllib.request.HTTPRedirectHandler):
-    def redirect_request(self, req, fp, code, msg, headers, newurl):
-        raise urllib.error.HTTPError(req.full_url, code, "redirect refused",
-                                     headers, fp)
+class _Deadline:
+    def __init__(self, seconds: float) -> None:
+        self.end = time.monotonic() + seconds
+
+    def remaining(self) -> float:
+        left = self.end - time.monotonic()
+        if left <= 0:
+            raise socket.timeout()
+        return left
+
+
+def _connection(url: str, timeout: float):
+    parts = urllib.parse.urlsplit(url)
+    cls = {"https": http.client.HTTPSConnection,
+           "http": http.client.HTTPConnection}.get(parts.scheme)
+    if cls is None or not parts.hostname:
+        raise ValueError("unsupported URL")
+    path = parts.path + (f"?{parts.query}" if parts.query else "")
+    return cls(parts.hostname, parts.port, timeout=timeout), path
 
 
 def post_for_audio(provider, url, headers, payload, timeout,
-                   opener=None) -> bytes:
-    """POST and return the audio body.
-
-    `timeout` bounds each socket wait and the whole request in total, so a
-    trickling server cannot hold the CLI open indefinitely.
-    """
-    deadline = time.monotonic() + timeout
-    opener = opener or urllib.request.build_opener(_NoRedirects())
-    request = urllib.request.Request(
-        url, data=json.dumps(payload).encode("utf-8"), method="POST",
-        headers={"Content-Type": "application/json", **headers})
+                   connect=None) -> bytes:
+    """POST and return the audio body; `timeout` bounds the whole call."""
+    deadline = _Deadline(timeout)
+    conn, path = (connect or _connection)(url, timeout)
+    # Closing the socket from another thread unblocks any pending read.
+    watchdog = threading.Timer(timeout, _abort, (conn,))
+    watchdog.daemon = True
+    watchdog.start()
     try:
-        with opener.open(request, timeout=timeout) as resp:
-            mime = resp.headers.get("Content-Type", "")
-            data = _read_capped(provider, resp, deadline)
-    except urllib.error.HTTPError as exc:
-        exc.close()
-        # Never surface provider error bodies; they can echo request data.
-        raise YapError(Exit.PROVIDER,
-                       f"{provider} returned HTTP {exc.code}") from None
-    except (urllib.error.URLError, OSError):
+        body = json.dumps(payload).encode("utf-8")
+        conn.request("POST", path, body=body, headers={
+            "Content-Type": "application/json", **headers})
+        resp = conn.getresponse()
+        if resp.status != 200:
+            # Never surface provider error bodies; they can echo the key.
+            raise YapError(Exit.PROVIDER,
+                           f"{provider} returned HTTP {resp.status}")
+        mime = resp.getheader("Content-Type", "")
+        data = _read_capped(provider, resp, deadline)
+    except (socket.timeout, TimeoutError):
+        raise YapError(Exit.PROVIDER, f"{provider} request timed out") \
+            from None
+    except (OSError, http.client.HTTPException, ValueError):
+        if time.monotonic() >= deadline.end:
+            raise YapError(Exit.PROVIDER, f"{provider} request timed out") \
+                from None
         raise YapError(Exit.PROVIDER, f"{provider} request failed") from None
+    finally:
+        watchdog.cancel()
+        conn.close()
     if not mime.lower().startswith("audio/") or not data:
         raise YapError(Exit.PROVIDER, f"{provider} returned no audio")
     return data
 
 
+def _abort(conn) -> None:
+    sock = getattr(conn, "sock", None)
+    if sock is not None:
+        try:
+            sock.shutdown(socket.SHUT_RDWR)
+        except OSError:
+            pass
+
+
 def _read_capped(provider, resp, deadline) -> bytes:
     data = bytearray()
     while True:
-        if time.monotonic() > deadline:
-            raise YapError(Exit.PROVIDER, f"{provider} request timed out")
-        chunk = resp.read(CHUNK)
+        deadline.remaining()  # raises once time is up
+        chunk = resp.read1(CHUNK)
         if not chunk:
             return bytes(data)
         data += chunk

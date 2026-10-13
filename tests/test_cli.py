@@ -72,6 +72,46 @@ class CliTest(unittest.TestCase):
         code, *_ = main_with(["-o", "x.mp3", "--private", "hi"])
         self.assertEqual(code, Exit.USAGE)
 
+    def test_out_missing_dir_refused_before_synthesis(self):
+        code, synth, _, err = main_with(["-o", "/nonexistent/dir/x.mp3",
+                                         "hi"])
+        self.assertEqual(code, Exit.OUTPUT_FILE)
+        synth.assert_not_called()
+        self.assertNotIn("Traceback", err)
+
+    def test_out_directory_refused_before_synthesis(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            code, synth, _, _ = main_with(["-o", tmp, "hi"])
+        self.assertEqual(code, Exit.OUTPUT_FILE)
+        synth.assert_not_called()
+
+    def test_write_error_is_clean_exit(self):
+        with mock.patch.object(cli.Path, "write_bytes",
+                               side_effect=PermissionError(13, "denied")):
+            code, _, _, err = main_with(["-o", "x.mp3", "hi"])
+        self.assertEqual(code, Exit.OUTPUT_FILE)
+        self.assertIn("could not write", err)
+
+    def test_broken_pipe_on_stdout_is_quiet(self):
+        stdout = mock.Mock()
+        stdout.buffer.write.side_effect = BrokenPipeError
+        stdout.fileno.return_value = 999  # dup2 is mocked below
+        with mock.patch("sys.stdout", stdout), \
+                mock.patch.object(cli.os, "dup2"):
+            code, _, _, err = main_with(["-o", "-", "hi"])
+        self.assertEqual(code, Exit.OK)
+        self.assertEqual(err, "")
+
+    def test_invalid_utf8_stdin_rejected(self):
+        stdin = mock.Mock()
+        stdin.buffer.read.return_value = b"\xff\xfe hi"
+        err = io.StringIO()
+        with mock.patch("sys.stdin", stdin), mock.patch("sys.stderr", err):
+            code = cli.main(["--dry-run"])
+        self.assertEqual(code, Exit.USAGE)
+        self.assertIn("UTF-8", err.getvalue())
+
     def test_empty_text(self):
         code, *_ = main_with([], stdin="  \n")
         self.assertEqual(code, Exit.USAGE)

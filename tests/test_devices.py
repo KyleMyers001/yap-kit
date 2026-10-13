@@ -19,6 +19,10 @@ class PrivateOutputTest(unittest.TestCase):
         self.assertTrue(is_private_output(
             Output("External Headphones", BUILTIN, "hdpn")))
 
+    def test_hdpn_requires_builtin_transport(self):
+        self.assertFalse(is_private_output(Output("USB Speaker", "usb ",
+                                                  "hdpn")))
+
     def test_beats_pill_refused(self):
         self.assertFalse(is_private_output(Output("Beats Pill", BT)))
 
