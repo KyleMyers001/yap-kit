@@ -1,11 +1,12 @@
-"""CoreAudio ctypes lookup of the default output device name (macOS only).
+"""CoreAudio ctypes lookup of the default output device (macOS only).
 
-Fallback for when system_profiler is unavailable. Ported from the
-airpods-say skill.
+Returns its name, transport type, and output data source. Ported and
+extended from the airpods-say skill.
 """
 
 import ctypes
 import ctypes.util
+from typing import Optional, Tuple
 
 _SYSTEM_OBJECT = 1
 _DEFAULT_OUTPUT = 0x644F7574   # 'dOut'
@@ -13,6 +14,9 @@ _SCOPE_GLOBAL = 0x676C6F62     # 'glob'
 _ELEMENT_MAIN = 0
 _PROPERTY_NAME = 0x6C6E616D    # 'lnam'
 _UTF8 = 0x08000100
+_TRANSPORT = 0x7472616E      # 'tran'
+_DATA_SOURCE = 0x73737263    # 'ssrc'
+_SCOPE_OUTPUT = 0x6F757470   # 'outp'
 
 
 class _Address(ctypes.Structure):
@@ -28,8 +32,8 @@ def _load(name: str) -> ctypes.CDLL:
     return ctypes.cdll.LoadLibrary(path)
 
 
-def _get_property(ca, obj, selector, out) -> None:
-    addr = _Address(selector, _SCOPE_GLOBAL, _ELEMENT_MAIN)
+def _get_property(ca, obj, selector, out, scope=_SCOPE_GLOBAL) -> None:
+    addr = _Address(selector, scope, _ELEMENT_MAIN)
     size = ctypes.c_uint32(ctypes.sizeof(out))
     err = ca.AudioObjectGetPropertyData(
         obj, ctypes.byref(addr), 0, None, ctypes.byref(size),
@@ -55,8 +59,16 @@ def _cfstring_to_str(cf, ref) -> str:
     return buf.value.decode("utf-8")
 
 
-def default_output_name() -> str:
-    """Return the default output device name. Raises OSError on failure."""
+def fourcc(value: int) -> str:
+    return value.to_bytes(4, "big").decode("latin-1")
+
+
+def default_output() -> Tuple[str, str, Optional[str]]:
+    """Return (name, transport, data_source) as FourCC strings.
+
+    data_source is None when the device has none (most Bluetooth devices).
+    Raises OSError on failure.
+    """
     ca = _load("CoreAudio")
     cf = _load("CoreFoundation")
     ca.AudioObjectGetPropertyData.restype = ctypes.c_int32
@@ -68,11 +80,20 @@ def default_output_name() -> str:
 
     device = ctypes.c_uint32(0)
     _get_property(ca, _SYSTEM_OBJECT, _DEFAULT_OUTPUT, device)
+    transport = ctypes.c_uint32(0)
+    _get_property(ca, device, _TRANSPORT, transport)
+    source = ctypes.c_uint32(0)
+    try:
+        _get_property(ca, device, _DATA_SOURCE, source, _SCOPE_OUTPUT)
+        data_source = fourcc(source.value)
+    except OSError:
+        data_source = None
     ref = ctypes.c_void_p(0)
     _get_property(ca, device, _PROPERTY_NAME, ref)
     if not ref.value:
         raise OSError("device name is NULL")
     try:
-        return _cfstring_to_str(cf, ref)
+        name = _cfstring_to_str(cf, ref)
     finally:
         cf.CFRelease(ref)
+    return name, fourcc(transport.value), data_source

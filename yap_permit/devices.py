@@ -4,44 +4,46 @@ Yap Permit never switches outputs. It checks the current macOS default
 output and refuses to play when that output is not allowed.
 """
 
-import json
-import subprocess
 from dataclasses import dataclass
 from typing import Callable, Optional
 
 from yap_permit import coreaudio
 from yap_permit.errors import Exit, YapError
 
-SYSTEM_PROFILER = "/usr/sbin/system_profiler"
-PRIVATE_KEYWORDS = ("airpods", "headphones", "beats", "earbuds", "buds")
+BLUETOOTH_TRANSPORTS = ("blue", "blea")   # Classic and LE
+HEADPHONE_DATA_SOURCE = "hdpn"            # wired headphones on the jack
+PRIVATE_NAME_WORDS = ("airpods", "headphones", "earbuds", "buds")
+SPEAKER_NAME_WORDS = ("speaker", "pill")
 
 
-def _name_from_system_profiler(run=subprocess.run) -> str:
-    result = run([SYSTEM_PROFILER, "SPAudioDataType", "-json",
-                  "-detailLevel", "mini"], capture_output=True, timeout=3)
-    if result.returncode != 0:
-        raise OSError("system_profiler failed")
-    data = json.loads(result.stdout)
-    for top in data.get("SPAudioDataType", []):
-        for dev in top.get("_items", []):
-            if (dev.get("coreaudio_default_audio_output_device")
-                    == "spaudio_yes" and dev.get("_name")):
-                return dev["_name"]
-    raise OSError("no default output reported")
+@dataclass(frozen=True)
+class Output:
+    name: str
+    transport: str = ""             # CoreAudio FourCC, e.g. "blue"
+    data_source: Optional[str] = None
 
 
-def default_output_name() -> str:
-    """Fast system_profiler path, then CoreAudio. Raises OSError."""
-    try:
-        return _name_from_system_profiler()
-    except (OSError, ValueError, AttributeError, TypeError,
-            subprocess.TimeoutExpired):
-        return coreaudio.default_output_name()
+def default_output() -> Output:
+    """Read the default output from CoreAudio. Raises OSError."""
+    return Output(*coreaudio.default_output())
 
 
-def is_private_output(name: str) -> bool:
-    lowered = name.lower()
-    return any(word in lowered for word in PRIVATE_KEYWORDS)
+def is_private_output(output: Output) -> bool:
+    """True only when the device type is verified as personal listening.
+
+    Wired: the built-in jack reports the headphone data source.
+    Bluetooth: transport is Bluetooth AND the name is on a strict allowlist
+    with no speaker words (Bluetooth speakers share the transport).
+    Anything unverified is refused.
+    """
+    if output.data_source == HEADPHONE_DATA_SOURCE:
+        return True
+    if output.transport not in BLUETOOTH_TRANSPORTS:
+        return False
+    name = output.name.lower()
+    if any(word in name for word in SPEAKER_NAME_WORDS):
+        return False
+    return any(word in name for word in PRIVATE_NAME_WORDS)
 
 
 @dataclass(frozen=True)
@@ -55,23 +57,23 @@ class OutputGate:
     def active(self) -> bool:
         return self.private or bool(self.device)
 
-    def allows(self, name: str) -> bool:
-        if self.private and not is_private_output(name):
+    def allows(self, output: Output) -> bool:
+        if self.private and not is_private_output(output):
             return False
-        if self.device and self.device.lower() not in name.lower():
+        if self.device and self.device.lower() not in output.name.lower():
             return False
         return True
 
-    def check(self, lookup: Optional[Callable[[], str]] = None) -> str:
-        """Return the allowed output name, or raise (fail closed)."""
+    def check(self, lookup: Optional[Callable[[], Output]] = None) -> Output:
+        """Return the allowed output, or raise (fail closed)."""
         try:
-            name = (lookup or default_output_name)()
+            output = (lookup or default_output)()
         except Exception:
             raise YapError(Exit.OUTPUT_REFUSED,
                            "could not detect the audio output") from None
-        if not self.allows(name):
+        if not self.allows(output):
             want = "private headphones" if self.private else self.device
             raise YapError(Exit.OUTPUT_REFUSED,
-                           f"current output '{name}' is not {want}; "
+                           f"current output '{output.name}' is not {want}; "
                            "switch outputs and retry")
-        return name
+        return output

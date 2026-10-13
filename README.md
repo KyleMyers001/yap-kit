@@ -26,7 +26,7 @@ echo "Tests passed" | yap                   # stdin (default when no text)
 yap --private "Your 3pm moved to 4."        # headphones only, or exit 2
 yap --device "Studio Display" "hello"       # require a named output
 yap -p elevenlabs -v VOICE_ID "hello"       # cloud provider
-yap -p openai -o hello.mp3 "hello"          # write a file, don't play
+yap -p openai -o hello.mp3 "hello"          # write a file (overwrites), don't play
 yap -p openai -o - "hello" | ffplay -i -    # write audio to stdout
 yap --dry-run --private "check"             # validate without speaking
 ```
@@ -64,9 +64,12 @@ default output. `--private` and `--device` add a gate on that output:
 
 - The output is checked **before** credentials are read or text is sent to
   a provider, again just before playback, and every 0.25 s during playback.
-- `--private` allows outputs whose name contains AirPods, Headphones,
-  Beats, Earbuds, or Buds. Anything else, or a failure to detect the output,
-  is refused (exit 2).
+- `--private` checks the device type through CoreAudio. It allows wired
+  headphones on the built-in jack, and Bluetooth devices whose name
+  contains AirPods, Headphones, Earbuds, or Buds and does not contain
+  Speaker or Pill. Everything else, including anything whose type cannot be
+  read, is refused (exit 2). Renamed Bluetooth devices are matched by name,
+  so give speakers names that don't look like headphones.
 - If the output changes or disappears mid-playback, playback stops
   (exit 3). This is polling, not device-bound routing, so a fraction of a
   second may still play on the new output.
@@ -85,7 +88,9 @@ default output. `--private` and `--device` add a gate on that output:
 | 7 | Player failed |
 | 130 | Cancelled (SIGINT or SIGTERM); playback stopped |
 
-Text is limited to 5,000 characters.
+Text is limited to 5,000 characters. `--out FILE` overwrites an existing
+file. Cloud responses are capped at 25 MB and the `--timeout` applies to
+the whole request.
 
 ## Roadmap
 

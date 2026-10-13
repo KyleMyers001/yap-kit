@@ -3,7 +3,7 @@ from pathlib import Path
 from unittest import mock
 
 from yap_permit import player
-from yap_permit.devices import OutputGate
+from yap_permit.devices import Output, OutputGate
 from yap_permit.errors import Exit, YapError
 
 
@@ -33,9 +33,12 @@ class FakeProc:
         return self.poll()
 
 
-def run_play(proc, gate, lookup=lambda: "AirPods"):
+AIRPODS = Output("AirPods", "blue")
+
+
+def run_play(proc, gate, lookup=lambda: AIRPODS):
     with mock.patch.object(player, "POLL_SECONDS", 0):
-        player.play(Path("a.mp3"), gate, "AirPods", lookup=lookup,
+        player.play(Path("a.mp3"), gate, AIRPODS, lookup=lookup,
                     popen=lambda *a, **k: proc,
                     which=lambda _: "/usr/bin/afplay")
 
@@ -48,9 +51,16 @@ class PlayTest(unittest.TestCase):
         proc = FakeProc(polls_until_done=100)
         with self.assertRaises(YapError) as ctx:
             run_play(proc, OutputGate(private=True),
-                     lookup=lambda: "MacBook Speakers")
+                     lookup=lambda: Output("MacBook Speakers", "bltn"))
         self.assertEqual(ctx.exception.code, Exit.OUTPUT_CHANGED)
         self.assertTrue(proc.terminated)
+
+    def test_stops_when_switched_to_other_headphones(self):
+        proc = FakeProc(polls_until_done=100)
+        with self.assertRaises(YapError) as ctx:
+            run_play(proc, OutputGate(private=True),
+                     lookup=lambda: Output("Other AirPods", "blue"))
+        self.assertEqual(ctx.exception.code, Exit.OUTPUT_CHANGED)
 
     def test_stops_when_detection_fails(self):
         def broken():
@@ -77,7 +87,7 @@ class PlayTest(unittest.TestCase):
             raise KeyboardInterrupt
         with mock.patch.object(player.time, "sleep", side_effect=interrupt):
             with self.assertRaises(YapError) as ctx:
-                player.play(Path("a"), OutputGate(), "", popen=lambda *a, **k:
+                player.play(Path("a"), OutputGate(), None, popen=lambda *a, **k:
                             proc, which=lambda _: "afplay")
         self.assertEqual(ctx.exception.code, Exit.CANCELLED)
         self.assertTrue(proc.terminated)

@@ -37,7 +37,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("-d", "--device",
                    help="require the current output name to contain this")
     p.add_argument("-o", "--out", help='write audio to a file ("-" = stdout)'
-                   " instead of playing")
+                   " instead of playing; overwrites existing files")
     p.add_argument("--timeout", type=float, default=60,
                    help="provider timeout in seconds (default 60)")
     p.add_argument("--dry-run", action="store_true",
@@ -65,10 +65,10 @@ def run(args) -> None:
     text = read_text(args.text)
     gate = OutputGate(private=args.private, device=args.device)
     # Gate before credentials or network so a refused output costs nothing.
-    output = gate.check() if gate.active else ""
+    output = gate.check() if gate.active else None
     if args.dry_run:
         print(f"ok: provider={args.provider} chars={len(text)}"
-              + (f" output={output!r}" if output else ""), file=sys.stderr)
+              + (f" output={output.name!r}" if output else ""), file=sys.stderr)
         return
     audio = synthesize(providers.Request(text, args.voice, args.model,
                                          args.timeout))

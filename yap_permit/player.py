@@ -12,7 +12,7 @@ import time
 from pathlib import Path
 from typing import Callable, Optional
 
-from yap_permit.devices import OutputGate, default_output_name
+from yap_permit.devices import Output, OutputGate, default_output
 from yap_permit.errors import Exit, YapError
 
 POLL_SECONDS = 0.25
@@ -28,11 +28,11 @@ def _stop(proc) -> None:
         proc.wait(timeout=3)
 
 
-def play(path: Path, gate: OutputGate, expected_output: str,
-         lookup: Optional[Callable[[], str]] = None,
+def play(path: Path, gate: OutputGate, expected_output: Output,
+         lookup: Optional[Callable[[], Output]] = None,
          popen=subprocess.Popen, which=shutil.which) -> None:
     """Block until playback finishes. Raises YapError on any failure."""
-    lookup = lookup or default_output_name
+    lookup = lookup or default_output
     afplay = which("afplay")
     if not afplay:
         raise YapError(Exit.DEPENDENCY, "macOS `afplay` not found")
@@ -53,7 +53,7 @@ def play(path: Path, gate: OutputGate, expected_output: str,
         raise YapError(Exit.PLAYBACK, "afplay failed")
 
 
-def _still_allowed(gate: OutputGate, expected: str, lookup) -> bool:
+def _still_allowed(gate: OutputGate, expected: Output, lookup) -> bool:
     try:
         current = lookup()
     except Exception:

@@ -1,58 +1,66 @@
-import json
-import subprocess
 import unittest
+from unittest import mock
 
 from yap_permit import devices
-from yap_permit.devices import OutputGate
+from yap_permit.devices import Output, OutputGate, is_private_output
 from yap_permit.errors import Exit, YapError
 
-
-def profiler_result(items, code=0):
-    out = json.dumps({"SPAudioDataType": [{"_items": items}]}).encode()
-    return subprocess.CompletedProcess([], code, out, b"")
+BT = "blue"
+BUILTIN = "bltn"
 
 
-class SystemProfilerTest(unittest.TestCase):
-    def test_returns_default_output(self):
-        items = [{"_name": "Speakers"},
-                 {"_name": "Kyle's AirPods Pro",
-                  "coreaudio_default_audio_output_device": "spaudio_yes"}]
-        name = devices._name_from_system_profiler(
-            run=lambda *a, **k: profiler_result(items))
-        self.assertEqual(name, "Kyle's AirPods Pro")
+class PrivateOutputTest(unittest.TestCase):
+    def test_bluetooth_airpods_allowed(self):
+        self.assertTrue(is_private_output(Output("Kyle's AirPods Pro", BT)))
+        self.assertTrue(is_private_output(Output("WH-1000 Headphones",
+                                                 "blea")))
 
-    def test_no_default_raises(self):
-        with self.assertRaises(OSError):
-            devices._name_from_system_profiler(
-                run=lambda *a, **k: profiler_result([{"_name": "X"}]))
+    def test_wired_headphone_jack_allowed(self):
+        self.assertTrue(is_private_output(
+            Output("External Headphones", BUILTIN, "hdpn")))
 
-    def test_nonzero_exit_raises(self):
-        with self.assertRaises(OSError):
-            devices._name_from_system_profiler(
-                run=lambda *a, **k: profiler_result([], code=1))
+    def test_beats_pill_refused(self):
+        self.assertFalse(is_private_output(Output("Beats Pill", BT)))
+
+    def test_beats_brand_alone_refused(self):
+        self.assertFalse(is_private_output(Output("Beats Studio", BT)))
+
+    def test_speaker_word_refused_even_with_headphone_word(self):
+        self.assertFalse(is_private_output(
+            Output("Headphones Speaker", BT)))
+
+    def test_headphone_name_on_non_bluetooth_refused(self):
+        # A renamed AirPlay/USB/built-in speaker must not pass on name.
+        for transport in ("airp", "usb ", BUILTIN, ""):
+            self.assertFalse(is_private_output(
+                Output("AirPods", transport)), transport)
+
+    def test_builtin_speakers_refused(self):
+        self.assertFalse(is_private_output(
+            Output("MacBook Pro Speakers", BUILTIN, "ispk")))
+
+
+class DefaultOutputTest(unittest.TestCase):
+    def test_wraps_coreaudio(self):
+        with mock.patch.object(devices.coreaudio, "default_output",
+                               return_value=("AirPods", BT, None)):
+            self.assertEqual(devices.default_output(), Output("AirPods", BT))
 
 
 class GateTest(unittest.TestCase):
-    def test_private_allows_headphones_only(self):
-        gate = OutputGate(private=True)
-        self.assertTrue(gate.allows("AirPods Max"))
-        self.assertTrue(gate.allows("External Headphones"))
-        self.assertFalse(gate.allows("MacBook Pro Speakers"))
-        self.assertFalse(gate.allows("Living Room"))
-
     def test_device_substring_case_insensitive(self):
         gate = OutputGate(device="studio")
-        self.assertTrue(gate.allows("Studio Display Speakers"))
-        self.assertFalse(gate.allows("AirPods"))
+        self.assertTrue(gate.allows(Output("Studio Display Speakers")))
+        self.assertFalse(gate.allows(Output("AirPods", BT)))
 
     def test_private_and_device_both_required(self):
         gate = OutputGate(private=True, device="max")
-        self.assertTrue(gate.allows("AirPods Max"))
-        self.assertFalse(gate.allows("AirPods Pro"))
+        self.assertTrue(gate.allows(Output("AirPods Max", BT)))
+        self.assertFalse(gate.allows(Output("AirPods Pro", BT)))
 
-    def test_check_refuses_speakers(self):
+    def test_check_refuses_beats_pill(self):
         with self.assertRaises(YapError) as ctx:
-            OutputGate(private=True).check(lambda: "MacBook Speakers")
+            OutputGate(private=True).check(lambda: Output("Beats Pill", BT))
         self.assertEqual(ctx.exception.code, Exit.OUTPUT_REFUSED)
 
     def test_check_fails_closed_when_detection_fails(self):
@@ -64,7 +72,7 @@ class GateTest(unittest.TestCase):
 
     def test_inactive_gate(self):
         self.assertFalse(OutputGate().active)
-        self.assertTrue(OutputGate().allows("anything"))
+        self.assertTrue(OutputGate().allows(Output("anything")))
 
 
 if __name__ == "__main__":
