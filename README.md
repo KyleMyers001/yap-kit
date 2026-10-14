@@ -62,7 +62,7 @@ EOF_SPEECH
 | --- | --- | --- |
 | `say` (default) | Stays on your Mac | none |
 | `elevenlabs` | ElevenLabs API | key + voice ID ([setup](#elevenlabs-setup)) |
-| `openai` | OpenAI API | key; voice optional ([setup](#openai-setup)) |
+| `openai` | OpenAI API | key; voice optional ([setup](#openai-setup), [voices and models](#openai-voices-and-models)) |
 
 Set the default provider with `YAP_PROVIDER` (e.g. `export YAP_PROVIDER=elevenlabs`).
 Cloud providers are bring-your-own-key. Keys are never accepted as
@@ -136,8 +136,40 @@ default model (`eleven_v4`).
 
 3. Test: `yap -p openai "Hello from OpenAI"`
 
-`--voice` overrides `OPENAI_VOICE`; `--model` overrides the default
-model (`gpt-4o-mini-tts`).
+### OpenAI voices and models
+
+`yap -p openai` calls OpenAI's standard Text-to-Speech API
+(`POST /v1/audio/speech`), not the Realtime API. It asks for MP3.
+
+**Voices are names, not IDs.** The default is `alloy`. Pick another with
+`-v` / `--voice` (or `OPENAI_VOICE`; the flag wins):
+
+```sh
+yap -p openai -v nova "Hello from Nova"
+```
+
+Built-in voices: `alloy`, `ash`, `ballad`, `coral`, `echo`, `fable`,
+`nova`, `onyx`, `sage`, `shimmer`, `verse`, `marin`, `cedar`. OpenAI
+recommends `marin` or `cedar` for best quality. `tts-1` and `tts-1-hd`
+support only `alloy`, `ash`, `coral`, `echo`, `fable`, `nova`, `onyx`,
+`sage`, and `shimmer`. OpenAI custom voice IDs (`voice_…`) aren't
+supported yet.
+
+**Models.** The default is `gpt-4o-mini-tts`. Change it with `-m` /
+`--model`:
+
+```sh
+yap -p openai -m tts-1 "Faster, lower quality"
+```
+
+Models: `gpt-4o-mini-tts` (default), `gpt-4o-mini-tts-2025-12-15`
+(dated snapshot), `tts-1` (lower latency), `tts-1-hd` (higher quality).
+
+`yap` passes voice and model names through unchanged, so newly added
+OpenAI voices and models work without an update; an invalid name comes
+back from OpenAI as an HTTP error (exit 5). OpenAI accepts at most 4,096
+characters per request, below `yap`'s own 5,000-character limit.
+Voice and model lists checked against OpenAI's docs in October 2026.
 
 ### Environment-variable fallback
 
