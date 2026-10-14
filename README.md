@@ -10,14 +10,10 @@ otherwise.
 
 ## Install (macOS)
 
-Until the first pull request is merged, the code lives on the
-`feat/mvp-cli` branch, so the commands below name it. After the merge,
-drop `-b feat/mvp-cli` and `@feat/mvp-cli`.
-
 From a clone (editable, good for development):
 
 ```sh
-git clone -b feat/mvp-cli https://github.com/KyleMyers001/yap-permit.git
+git clone https://github.com/KyleMyers001/yap-permit.git
 cd yap-permit
 python3 -m venv .venv
 source .venv/bin/activate
@@ -31,7 +27,7 @@ Or install without cloning:
 ```sh
 python3 -m venv ~/.yap-venv && source ~/.yap-venv/bin/activate
 pip install --upgrade pip
-pip install "git+https://github.com/KyleMyers001/yap-permit@feat/mvp-cli"
+pip install "git+https://github.com/KyleMyers001/yap-permit"
 ```
 
 Requires Python 3.9+. No third-party Python packages. Run
