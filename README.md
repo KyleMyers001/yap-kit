@@ -10,17 +10,28 @@ otherwise.
 
 ## Install (macOS)
 
-The repo is private for now, so clone it with your own GitHub access
-(for example `gh auth login` first, or an SSH key on your account):
+Until the first pull request is merged, the code lives on the
+`feat/mvp-cli` branch, so the commands below name it. After the merge,
+drop `-b feat/mvp-cli` and `@feat/mvp-cli`.
+
+From a clone (editable, good for development):
 
 ```sh
-gh repo clone KyleMyers001/yap-permit   # or: git clone git@github.com:KyleMyers001/yap-permit.git
+git clone -b feat/mvp-cli https://github.com/KyleMyers001/yap-permit.git
 cd yap-permit
 python3 -m venv .venv
 source .venv/bin/activate
 pip install --upgrade pip   # macOS ships pip 21, which can't do editable installs from pyproject.toml
 pip install -e .
 yap --dry-run "hello"
+```
+
+Or install without cloning:
+
+```sh
+python3 -m venv ~/.yap-venv && source ~/.yap-venv/bin/activate
+pip install --upgrade pip
+pip install "git+https://github.com/KyleMyers001/yap-permit@feat/mvp-cli"
 ```
 
 Requires Python 3.9+. No third-party Python packages. Run

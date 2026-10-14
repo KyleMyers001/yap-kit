@@ -1,5 +1,6 @@
-import os
 import io
+import os
+import tempfile
 import unittest
 from unittest import mock
 
@@ -60,7 +61,6 @@ class CliTest(unittest.TestCase):
         play.assert_not_called()
 
     def test_out_writes_file_without_playing(self):
-        import tempfile, os
         with tempfile.TemporaryDirectory() as tmp:
             path = os.path.join(tmp, "a.mp3")
             code, _, play, _ = main_with(["-o", path, "hi"])
@@ -81,7 +81,6 @@ class CliTest(unittest.TestCase):
         self.assertNotIn("Traceback", err)
 
     def test_out_directory_refused_before_synthesis(self):
-        import tempfile
         with tempfile.TemporaryDirectory() as tmp:
             code, synth, _, _ = main_with(["-o", tmp, "hi"])
         self.assertEqual(code, Exit.OUTPUT_FILE)
@@ -90,7 +89,6 @@ class CliTest(unittest.TestCase):
     @unittest.skipIf(os.name != "posix" or os.geteuid() == 0,
                      "needs POSIX permissions as non-root")
     def test_existing_writable_file_in_readonly_dir_allowed(self):
-        import tempfile
         with tempfile.TemporaryDirectory() as tmp:
             path = os.path.join(tmp, "a.mp3")
             open(path, "wb").close()
@@ -105,8 +103,21 @@ class CliTest(unittest.TestCase):
 
     @unittest.skipIf(os.name != "posix" or os.geteuid() == 0,
                      "needs POSIX permissions as non-root")
+    def test_readonly_file_in_writable_dir_refused(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "a.mp3")
+            with open(path, "wb") as f:
+                f.write(b"OLD")
+            os.chmod(path, 0o444)
+            code, synth, _, _ = main_with(["-o", path, "hi"])
+            with open(path, "rb") as f:
+                self.assertEqual(f.read(), b"OLD")
+        self.assertEqual(code, Exit.OUTPUT_FILE)
+        synth.assert_not_called()
+
+    @unittest.skipIf(os.name != "posix" or os.geteuid() == 0,
+                     "needs POSIX permissions as non-root")
     def test_new_file_in_readonly_dir_refused(self):
-        import tempfile
         with tempfile.TemporaryDirectory() as tmp:
             os.chmod(tmp, 0o555)
             try:
