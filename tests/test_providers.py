@@ -65,6 +65,20 @@ class OpenAITest(unittest.TestCase):
         self.assertEqual(payload["input"], "hi")
 
 
+class OpenAIVoiceEnvTest(unittest.TestCase):
+    def test_voice_from_env(self):
+        post = FakePost()
+        openai.synthesize(Request("hi"), post=post,
+                          env={"OPENAI_API_KEY": "k", "OPENAI_VOICE": "nova"})
+        self.assertEqual(post.calls[0][3]["voice"], "nova")
+
+    def test_flag_beats_env(self):
+        post = FakePost()
+        openai.synthesize(Request("hi", voice="echo"), post=post,
+                          env={"OPENAI_API_KEY": "k", "OPENAI_VOICE": "nova"})
+        self.assertEqual(post.calls[0][3]["voice"], "echo")
+
+
 class MacSayTest(unittest.TestCase):
     def test_writes_aiff_via_say(self):
         def run(cmd, input, **kwargs):

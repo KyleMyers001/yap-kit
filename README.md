@@ -8,15 +8,24 @@ otherwise.
 > Status: early MVP. Playback is macOS-only (`afplay`); `--out` works
 > anywhere the provider works.
 
-## Install
+## Install (macOS)
+
+The repo is private for now, so clone it with your own GitHub access
+(for example `gh auth login` first, or an SSH key on your account):
 
 ```sh
-pipx install git+https://github.com/KyleMyers001/yap-permit
-# or, from a checkout:
-python3 -m yap_permit "hello"
+gh repo clone KyleMyers001/yap-permit   # or: git clone git@github.com:KyleMyers001/yap-permit.git
+cd yap-permit
+python3 -m venv .venv
+source .venv/bin/activate
+pip install --upgrade pip   # macOS ships pip 21, which can't do editable installs from pyproject.toml
+pip install -e .
+yap --dry-run "hello"
 ```
 
-Requires Python 3.9+. No third-party Python packages.
+Requires Python 3.9+. No third-party Python packages. Run
+`source .venv/bin/activate` in each new terminal, or call
+`/path/to/yap-permit/.venv/bin/yap` directly.
 
 ## Usage
 
@@ -45,17 +54,99 @@ EOF_SPEECH
 | Name | Where text goes | Setup |
 | --- | --- | --- |
 | `say` (default) | Stays on your Mac | none |
-| `elevenlabs` | ElevenLabs API | `ELEVENLABS_VOICE_ID` or `--voice`, plus a key |
-| `openai` | OpenAI API | a key; voice defaults to `alloy` |
+| `elevenlabs` | ElevenLabs API | key + voice ID ([setup](#elevenlabs-setup)) |
+| `openai` | OpenAI API | key; voice optional ([setup](#openai-setup)) |
 
-Set the default with `YAP_PROVIDER`. Cloud providers are bring-your-own-key.
-Supply a key with either:
+Set the default provider with `YAP_PROVIDER` (e.g. `export YAP_PROVIDER=elevenlabs`).
+Cloud providers are bring-your-own-key. Keys are never accepted as
+arguments and never printed. `yap` reads a key from, in order:
 
-- `ELEVENLABS_API_KEY` / `OPENAI_API_KEY`, or
-- `<PROVIDER>_KEYCHAIN_SERVICE` and `<PROVIDER>_KEYCHAIN_ACCOUNT`, naming an
-  existing macOS Keychain item (`ELEVENLABS_…`, `OPENAI_…`).
+1. `<PROVIDER>_API_KEY` (environment variable), else
+2. the macOS Keychain item named by `<PROVIDER>_KEYCHAIN_SERVICE` and
+   `<PROVIDER>_KEYCHAIN_ACCOUNT` (recommended).
 
-Keys are never accepted as arguments and never printed.
+### ElevenLabs setup
+
+1. Store your API key in the Keychain. This prompts for the key, so it
+   never lands in shell history:
+
+   ```sh
+   security add-generic-password -s yap-elevenlabs -a "$USER" -w
+   ```
+
+   Stricter option: add `-T ''` so **every** read asks for your login
+   password (no app is pre-approved):
+
+   ```sh
+   security add-generic-password -s yap-elevenlabs -a "$USER" -T '' -w
+   ```
+
+   When macOS asks whether `security` may read the item, click **Allow**,
+   not **Always Allow**. "Always Allow" lets that tool read the key
+   silently from then on.
+
+2. Find a voice ID: in ElevenLabs, open **Voices** (My Voices or the
+   Voice Library), choose a voice, and use **Copy voice ID** from its menu
+   or details panel. It's a string like `21m00Tcm4TlvDq8ikWAM`.
+
+3. Point `yap` at the key and voice. Add these lines to `~/.zshrc` so
+   new terminals have them, then run `source ~/.zshrc`:
+
+   ```sh
+   export ELEVENLABS_KEYCHAIN_SERVICE=yap-elevenlabs
+   export ELEVENLABS_KEYCHAIN_ACCOUNT="$USER"
+   export ELEVENLABS_VOICE_ID=your-voice-id
+   ```
+
+   These are lookup names, not secrets. Then test:
+
+   ```sh
+   yap -p elevenlabs "Hello from ElevenLabs"
+   ```
+
+`--voice` overrides `ELEVENLABS_VOICE_ID`; `--model` overrides the
+default model (`eleven_v4`).
+
+### OpenAI setup
+
+1. Store your API key (create one at platform.openai.com → API keys):
+
+   ```sh
+   security add-generic-password -s yap-openai -a "$USER" -w
+   # stricter, prompts on every read:
+   security add-generic-password -s yap-openai -a "$USER" -T '' -w
+   ```
+
+   Same rule: click **Allow**, not **Always Allow**.
+
+2. Add to `~/.zshrc`, then `source ~/.zshrc`:
+
+   ```sh
+   export OPENAI_KEYCHAIN_SERVICE=yap-openai
+   export OPENAI_KEYCHAIN_ACCOUNT="$USER"
+   export OPENAI_VOICE=alloy   # optional; e.g. alloy, nova, echo
+   ```
+
+3. Test: `yap -p openai "Hello from OpenAI"`
+
+`--voice` overrides `OPENAI_VOICE`; `--model` overrides the default
+model (`gpt-4o-mini-tts`).
+
+### Environment-variable fallback
+
+Not on macOS, or no Keychain? Set the key directly:
+
+```sh
+read -rs ELEVENLABS_API_KEY && export ELEVENLABS_API_KEY   # paste, Enter
+read -rs OPENAI_API_KEY && export OPENAI_API_KEY
+```
+
+`read -s` keeps the key out of shell history and off the screen. Avoid
+`export KEY=sk-...` typed on the command line (it is saved in history),
+and avoid putting raw keys in `~/.zshrc` or other profiles: they are
+plain-text files that backups, dotfile repos, and other tools can read.
+If you must, use a secrets manager or the Keychain instead. If a key is
+exposed, revoke it with the provider.
 
 ## Output routing and private mode
 
@@ -105,4 +196,4 @@ the whole request.
 python3 -m unittest discover -s tests -t .
 ```
 
-See [AGENTS.md](AGENTS.md). MIT licensed.
+See [AGENTS.md](AGENTS.md) and [SECURITY.md](SECURITY.md). MIT licensed.
