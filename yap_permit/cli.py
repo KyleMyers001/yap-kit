@@ -101,8 +101,10 @@ def _check_writable(out: str) -> None:
     if not parent.is_dir():
         raise YapError(Exit.OUTPUT_FILE, f"--out directory {parent} "
                        "does not exist")
-    if not os.access(parent, os.W_OK) or (
-            path.exists() and not os.access(path, os.W_OK)):
+    # An existing file (or device like /dev/stdout) only needs to be
+    # writable itself; a new file needs a writable directory.
+    target = path if path.exists() else parent
+    if not os.access(target, os.W_OK):
         raise YapError(Exit.OUTPUT_FILE, f"--out {out} is not writable")
 
 

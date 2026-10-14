@@ -16,7 +16,7 @@ def synthesize(req: Request, post=post_for_audio,
     key = credentials.api_key("OPENAI", env=env)
     payload = {
         "model": req.model or DEFAULT_MODEL,
-        "voice": req.voice or DEFAULT_VOICE,
+        "voice": req.voice or env.get("OPENAI_VOICE") or DEFAULT_VOICE,
         "input": req.text,
         "response_format": "mp3",
     }

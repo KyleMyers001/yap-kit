@@ -1,4 +1,6 @@
 import io
+import os
+import tempfile
 import unittest
 from unittest import mock
 
@@ -59,7 +61,6 @@ class CliTest(unittest.TestCase):
         play.assert_not_called()
 
     def test_out_writes_file_without_playing(self):
-        import tempfile, os
         with tempfile.TemporaryDirectory() as tmp:
             path = os.path.join(tmp, "a.mp3")
             code, _, play, _ = main_with(["-o", path, "hi"])
@@ -80,11 +81,59 @@ class CliTest(unittest.TestCase):
         self.assertNotIn("Traceback", err)
 
     def test_out_directory_refused_before_synthesis(self):
-        import tempfile
         with tempfile.TemporaryDirectory() as tmp:
             code, synth, _, _ = main_with(["-o", tmp, "hi"])
         self.assertEqual(code, Exit.OUTPUT_FILE)
         synth.assert_not_called()
+
+    @unittest.skipIf(os.name != "posix" or os.geteuid() == 0,
+                     "needs POSIX permissions as non-root")
+    def test_existing_writable_file_in_readonly_dir_allowed(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "a.mp3")
+            open(path, "wb").close()
+            os.chmod(tmp, 0o555)
+            try:
+                code, _, _, err = main_with(["-o", path, "hi"])
+                with open(path, "rb") as f:
+                    self.assertEqual(f.read(), b"ID3")
+            finally:
+                os.chmod(tmp, 0o755)
+        self.assertEqual(code, Exit.OK, err)
+
+    @unittest.skipIf(os.name != "posix" or os.geteuid() == 0,
+                     "needs POSIX permissions as non-root")
+    def test_readonly_file_in_writable_dir_refused(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "a.mp3")
+            with open(path, "wb") as f:
+                f.write(b"OLD")
+            os.chmod(path, 0o444)
+            code, synth, _, _ = main_with(["-o", path, "hi"])
+            with open(path, "rb") as f:
+                self.assertEqual(f.read(), b"OLD")
+        self.assertEqual(code, Exit.OUTPUT_FILE)
+        synth.assert_not_called()
+
+    @unittest.skipIf(os.name != "posix" or os.geteuid() == 0,
+                     "needs POSIX permissions as non-root")
+    def test_new_file_in_readonly_dir_refused(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            os.chmod(tmp, 0o555)
+            try:
+                code, synth, _, _ = main_with(
+                    ["-o", os.path.join(tmp, "new.mp3"), "hi"])
+            finally:
+                os.chmod(tmp, 0o755)
+        self.assertEqual(code, Exit.OUTPUT_FILE)
+        synth.assert_not_called()
+
+    @unittest.skipUnless(os.path.exists("/dev/stdout")
+                         and os.access("/dev/stdout", os.W_OK),
+                         "/dev/stdout not available")
+    def test_dev_stdout_passes_precheck(self):
+        # Pre-check only: the real write would hit the test runner's stdout.
+        cli._check_writable("/dev/stdout")
 
     def test_write_error_is_clean_exit(self):
         with mock.patch.object(cli.Path, "write_bytes",
