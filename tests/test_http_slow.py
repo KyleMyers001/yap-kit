@@ -5,8 +5,8 @@ import threading
 import time
 import unittest
 
-from yap_permit.errors import Exit, YapError
-from yap_permit.providers.http import post_for_audio
+from yap_kit.errors import Exit, YapError
+from yap_kit.providers.http import post_for_audio
 
 
 class Handler(http.server.BaseHTTPRequestHandler):

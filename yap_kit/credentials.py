@@ -6,7 +6,7 @@ Keys are never accepted as command-line arguments and never printed.
 import os
 import subprocess
 
-from yap_permit.errors import Exit, YapError
+from yap_kit.errors import Exit, YapError
 
 
 def api_key(prefix: str, env=os.environ, run=subprocess.run) -> str:

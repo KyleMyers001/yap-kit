@@ -1,14 +1,14 @@
 """Default-output detection and the output gate for --private / --device.
 
-Yap Permit never switches outputs. It checks the current macOS default
+Yap Kit never switches outputs. It checks the current macOS default
 output and refuses to play when that output is not allowed.
 """
 
 from dataclasses import dataclass
 from typing import Callable, Optional
 
-from yap_permit import coreaudio
-from yap_permit.errors import Exit, YapError
+from yap_kit import coreaudio
+from yap_kit.errors import Exit, YapError
 
 BLUETOOTH_TRANSPORTS = ("blue", "blea")   # Classic and LE
 BUILTIN_TRANSPORT = "bltn"

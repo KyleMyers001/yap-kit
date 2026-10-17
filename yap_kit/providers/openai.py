@@ -2,9 +2,9 @@
 
 import os
 
-from yap_permit import credentials
-from yap_permit.providers import Audio, Request
-from yap_permit.providers.http import post_for_audio
+from yap_kit import credentials
+from yap_kit.providers import Audio, Request
+from yap_kit.providers.http import post_for_audio
 
 URL = "https://api.openai.com/v1/audio/speech"
 DEFAULT_MODEL = "gpt-4o-mini-tts"

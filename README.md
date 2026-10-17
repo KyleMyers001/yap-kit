@@ -1,7 +1,10 @@
-# Yap Permit
+# Yap Kit
 
-An open-source, agent-friendly text-to-speech CLI. `yap` speaks text through
-your current audio output, can write audio to a file or stdout, and has a
+An open-source, multi-provider text-to-speech CLI for AI agents. Everything
+they need to yap.
+
+`yap` speaks text through your current audio output, can write audio to a
+file or stdout, and has a
 **private mode** that only plays through AirPods or headphones and refuses
 otherwise.
 
@@ -13,8 +16,8 @@ otherwise.
 From a clone (editable, good for development):
 
 ```sh
-git clone https://github.com/KyleMyers001/yap-permit.git
-cd yap-permit
+git clone https://github.com/KyleMyers001/yap-kit.git
+cd yap-kit
 python3 -m venv .venv
 source .venv/bin/activate
 pip install --upgrade pip   # macOS ships pip 21, which can't do editable installs from pyproject.toml
@@ -27,12 +30,17 @@ Or install without cloning:
 ```sh
 python3 -m venv ~/.yap-venv && source ~/.yap-venv/bin/activate
 pip install --upgrade pip
-pip install "git+https://github.com/KyleMyers001/yap-permit"
+pip install "git+https://github.com/KyleMyers001/yap-kit"
 ```
 
 Requires Python 3.9+. No third-party Python packages. Run
 `source .venv/bin/activate` in each new terminal, or call
-`/path/to/yap-permit/.venv/bin/yap` directly.
+`/path/to/yap-kit/.venv/bin/yap` directly.
+
+If you installed the project under its previous name, use a fresh virtual
+environment for Yap Kit to avoid overlapping `yap` entry points. The command
+remains `yap`; environment variables and Keychain setup are unchanged. For
+module-based invocation, use `python3 -m yap_kit`.
 
 ## Usage
 

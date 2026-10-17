@@ -3,7 +3,7 @@
 from dataclasses import dataclass
 from typing import Callable, Dict, Optional
 
-from yap_permit.errors import Exit, YapError
+from yap_kit.errors import Exit, YapError
 
 
 @dataclass(frozen=True)
@@ -25,7 +25,7 @@ Synthesize = Callable[[Request], Audio]
 
 def registry() -> Dict[str, Synthesize]:
     # Imported lazily so one provider's imports never break another.
-    from yap_permit.providers import elevenlabs, macos_say, openai
+    from yap_kit.providers import elevenlabs, macos_say, openai
     return {
         "say": macos_say.synthesize,
         "elevenlabs": elevenlabs.synthesize,

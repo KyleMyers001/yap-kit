@@ -2,9 +2,9 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-from yap_permit import player
-from yap_permit.devices import Output, OutputGate
-from yap_permit.errors import Exit, YapError
+from yap_kit import player
+from yap_kit.devices import Output, OutputGate
+from yap_kit.errors import Exit, YapError
 
 
 class FakeProc:
