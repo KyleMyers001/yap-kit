@@ -1,8 +1,8 @@
 import subprocess
 import unittest
 
-from yap_permit.credentials import api_key
-from yap_permit.errors import Exit, YapError
+from yap_kit.credentials import api_key
+from yap_kit.errors import Exit, YapError
 
 
 def never_run(*a, **k):

@@ -4,12 +4,12 @@ Guidance for anyone (human or AI) changing this repository.
 
 ## Project
 
-`yap` is a text-to-speech CLI. It reads text, synthesizes it with a
+Yap Kit (`yap`) is a text-to-speech CLI. It reads text, synthesizes it with a
 provider, and plays it on the current macOS output or writes it to a file.
 Python 3.9+, standard library only.
 
 ```
-yap_permit/
+yap_kit/
   cli.py          argument parsing and the run pipeline
   errors.py       exit codes (public contract) and YapError
   devices.py      default-output detection and the output gate
@@ -24,7 +24,7 @@ tests/            unittest, no network, no audio hardware
 
 ```sh
 python3 -m unittest discover -s tests -t .   # run tests
-python3 -m yap_permit --dry-run "hello"       # run without installing
+python3 -m yap_kit --dry-run "hello"       # run without installing
 ```
 
 ## Rules

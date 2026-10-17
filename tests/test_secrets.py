@@ -4,8 +4,8 @@ import io
 import unittest
 from unittest import mock
 
-from yap_permit import cli
-from yap_permit.devices import Output
+from yap_kit import cli
+from yap_kit.devices import Output
 
 KEY = "sk-test-SUPERSECRET-123"
 
@@ -41,9 +41,9 @@ def run_cli(argv, exc):
     with mock.patch.dict("os.environ", env, clear=True), \
             mock.patch("sys.stderr", err), \
             mock.patch("sys.stdout", io.StringIO()), \
-            mock.patch("yap_permit.providers.http._connection",
+            mock.patch("yap_kit.providers.http._connection",
                        return_value=(conn, "/")), \
-            mock.patch("yap_permit.devices.default_output",
+            mock.patch("yap_kit.devices.default_output",
                        return_value=Output("AirPods", "blue")):
         code = cli.main(argv)
     return code, err.getvalue()

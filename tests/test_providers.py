@@ -5,10 +5,10 @@ import unittest.mock
 import urllib.error
 from pathlib import Path
 
-from yap_permit import providers
-from yap_permit.errors import Exit, YapError
-from yap_permit.providers import Request, elevenlabs, macos_say, openai
-from yap_permit.providers.http import post_for_audio
+from yap_kit import providers
+from yap_kit.errors import Exit, YapError
+from yap_kit.providers import Request, elevenlabs, macos_say, openai
+from yap_kit.providers.http import post_for_audio
 
 
 class FakePost:
@@ -155,7 +155,7 @@ class HttpTest(unittest.TestCase):
         self.assertEqual(ctx.exception.code, Exit.PROVIDER)
 
     def test_response_size_cap(self):
-        from yap_permit.providers import http
+        from yap_kit.providers import http
         with unittest.mock.patch.object(http, "MAX_AUDIO_BYTES", 10):
             with self.assertRaises(YapError) as ctx:
                 self.call(FakeResponse(b"x" * 11, "audio/mpeg"))
@@ -175,7 +175,7 @@ class HttpTest(unittest.TestCase):
     def test_watchdog_abort_is_timeout_not_partial_success(self):
         # Fire the watchdog's abort exactly when the body is cut off,
         # long before the 60 s deadline, so no timing is involved.
-        from yap_permit.providers import http
+        from yap_kit.providers import http
         conn = FakeConn(None)
         resp = CutOffResponse(lambda: http._abort(conn, aborted))
         conn.result = resp

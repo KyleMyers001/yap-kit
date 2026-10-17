@@ -4,10 +4,10 @@ import os
 import re
 import urllib.parse
 
-from yap_permit import credentials
-from yap_permit.errors import Exit, YapError
-from yap_permit.providers import Audio, Request
-from yap_permit.providers.http import post_for_audio
+from yap_kit import credentials
+from yap_kit.errors import Exit, YapError
+from yap_kit.providers import Audio, Request
+from yap_kit.providers.http import post_for_audio
 
 URL = "https://api.elevenlabs.io/v1/text-to-speech/{voice}"
 DEFAULT_MODEL = "eleven_v4"

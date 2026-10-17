@@ -5,8 +5,8 @@ import subprocess
 import tempfile
 from pathlib import Path
 
-from yap_permit.errors import Exit, YapError
-from yap_permit.providers import Audio, Request
+from yap_kit.errors import Exit, YapError
+from yap_kit.providers import Audio, Request
 
 
 def synthesize(req: Request, run=subprocess.run,

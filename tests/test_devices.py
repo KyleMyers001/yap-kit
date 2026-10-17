@@ -1,9 +1,9 @@
 import unittest
 from unittest import mock
 
-from yap_permit import devices
-from yap_permit.devices import Output, OutputGate, is_private_output
-from yap_permit.errors import Exit, YapError
+from yap_kit import devices
+from yap_kit.devices import Output, OutputGate, is_private_output
+from yap_kit.errors import Exit, YapError
 
 BT = "blue"
 BUILTIN = "bltn"

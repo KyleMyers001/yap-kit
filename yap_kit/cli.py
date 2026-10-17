@@ -8,10 +8,10 @@ import tempfile
 from pathlib import Path
 from typing import Optional
 
-from yap_permit import __version__, providers
-from yap_permit.devices import OutputGate
-from yap_permit.errors import Exit, YapError
-from yap_permit.player import play
+from yap_kit import __version__, providers
+from yap_kit.devices import OutputGate
+from yap_kit.errors import Exit, YapError
+from yap_kit.player import play
 
 MAX_CHARS = 5000
 

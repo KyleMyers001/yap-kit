@@ -4,10 +4,10 @@ import tempfile
 import unittest
 from unittest import mock
 
-from yap_permit import cli
-from yap_permit.errors import Exit
-from yap_permit.devices import Output
-from yap_permit.providers import Audio
+from yap_kit import cli
+from yap_kit.errors import Exit
+from yap_kit.devices import Output
+from yap_kit.providers import Audio
 
 AIRPODS = Output("AirPods Pro", "blue")
 SPEAKERS = Output("MacBook Pro Speakers", "bltn", "ispk")
@@ -18,9 +18,9 @@ def main_with(argv, stdin="", output=AIRPODS, synth=None):
     err = io.StringIO()
     with mock.patch("sys.stdin", io.StringIO(stdin)), \
             mock.patch("sys.stderr", err), \
-            mock.patch("yap_permit.devices.default_output",
+            mock.patch("yap_kit.devices.default_output",
                        **_lookup(output)), \
-            mock.patch("yap_permit.providers.get", return_value=synth), \
+            mock.patch("yap_kit.providers.get", return_value=synth), \
             mock.patch.object(cli, "play") as play:
         code = cli.main(argv)
     return code, synth, play, err.getvalue()

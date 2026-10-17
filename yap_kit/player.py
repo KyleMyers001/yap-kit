@@ -12,8 +12,8 @@ import time
 from pathlib import Path
 from typing import Callable, Optional
 
-from yap_permit.devices import Output, OutputGate, default_output
-from yap_permit.errors import Exit, YapError
+from yap_kit.devices import Output, OutputGate, default_output
+from yap_kit.errors import Exit, YapError
 
 POLL_SECONDS = 0.25
 

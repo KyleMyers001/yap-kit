@@ -52,7 +52,7 @@ class SigtermTest(unittest.TestCase):
                    "PYTHONPATH": str(ROOT)}
             env.pop("YAP_PROVIDER", None)
             proc = subprocess.Popen(
-                [sys.executable, "-m", "yap_permit", "hello"], env=env,
+                [sys.executable, "-m", "yap_kit", "hello"], env=env,
                 stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
             deadline = time.monotonic() + 10
             while not (pidfile.exists() and pidfile.read_text().strip()):

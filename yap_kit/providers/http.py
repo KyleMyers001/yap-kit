@@ -12,7 +12,7 @@ import threading
 import time
 import urllib.parse
 
-from yap_permit.errors import Exit, YapError
+from yap_kit.errors import Exit, YapError
 
 MAX_AUDIO_BYTES = 25 * 1024 * 1024  # ~25 min of 128 kbps MP3
 CHUNK = 64 * 1024
