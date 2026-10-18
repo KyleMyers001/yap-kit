@@ -13,7 +13,7 @@ yap_kit/
   cli.py          argument parsing and the run pipeline
   errors.py       exit codes (public contract) and YapError
   devices.py      default-output detection and the output gate
-  coreaudio.py    ctypes fallback for output detection
+  coreaudio.py    CoreAudio (ctypes) lookup of the default output
   player.py       afplay playback with output monitoring and cancellation
   credentials.py  API keys from env or macOS Keychain
   providers/      one module per TTS provider, plus a shared HTTP helper
@@ -24,7 +24,7 @@ tests/            unittest, no network, no audio hardware
 
 ```sh
 python3 -m unittest discover -s tests -t .   # run tests
-python3 -m yap_kit --dry-run "hello"       # run without installing
+python3 -m yap_kit --dry-run "hello"         # run without installing
 ```
 
 ## Rules
